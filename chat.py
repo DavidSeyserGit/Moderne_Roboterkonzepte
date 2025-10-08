@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore")
 llm = LLMInterface()
 history = []
 
-print("Gemini 2.5 Flash – Chatmodus (Strg + C zum Beenden)\n")
+print("Gemini 2.5 Flash – Chatmodus (Tippe 'exit' zum Beenden)\n")
 
 while True:
     user_input = input("Du: ")
@@ -28,3 +28,4 @@ while True:
 
     # Antwort im Verlauf speichern
     history.append(f"AI: {answer}")
+
