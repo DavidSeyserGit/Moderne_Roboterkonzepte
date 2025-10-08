@@ -48,7 +48,7 @@ python chat.py
 
   ## Beispielausgabe:
 
-   Gemini 2.5 Flash – Chatmodus (Strg + C zum Beenden)
+   Gemini 2.5 Flash – Chatmodus (Tippe 'exit' zum Beenden)
 
    Du: Hallo!
    Gemini: Hallo! Wie kann ich Ihnen helfen?
@@ -66,3 +66,4 @@ from llm_interface import LLMInterface
 llm = LLMInterface()
 antwort = llm.query("Was macht der Roboter gerade? Sind wir bereit?")
 print(antwort)
+
