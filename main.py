@@ -51,7 +51,7 @@ async def on_chat_start():
     cl.user_session.set("api_key", api_key)
 
     await cl.Message(
-        content=f"✅ Modell gesetzt auf **{chosen_model}**.\n\n👋 Willkommen! Stelle mir deine erste Frage!"
+        content=f"Modell gesetzt auf **{chosen_model}**.\n\n Willkommen! Stelle mir deine erste Frage!"
     ).send()
 
 
@@ -71,7 +71,7 @@ async def on_settings_update(settings: dict):
         cl.user_session.set("model", new_model)
 
         await cl.Message(
-            content=f"🔄 Modell erfolgreich gewechselt!\n\nAktuelles Modell: **{new_model}**"
+            content=f"Modell erfolgreich gewechselt!\n\nAktuelles Modell: **{new_model}**"
         ).send()
 
 
@@ -83,7 +83,7 @@ async def on_message(message: cl.Message):
     """Behandelt eingehende Nachrichten."""
     chatbot: Chatbot = cl.user_session.get("chatbot")
     if not chatbot:
-        await cl.Message(content="⚠️ Kein Modell aktiv. Bitte starte den Chat neu.").send()
+        await cl.Message(content="Kein Modell aktiv. Bitte starte den Chat neu.").send()
         return
 
     answer = chatbot.get_response(message.content)
@@ -93,3 +93,4 @@ async def on_message(message: cl.Message):
     for token in answer.split():
         await msg.stream_token(token + " ")
     await msg.send()
+
