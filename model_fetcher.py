@@ -22,7 +22,18 @@ class ModelFetcher:
         reasoning: bool = False,
         cache: bool = False,
     ):
-        """Lädt Modelle von OpenRouter mit flexiblen Filtern."""
+        """
+        Lädt Modelle von OpenRouter mit flexiblen Filtern.
+        Parameter:
+            free (bool): Nur kostenlose Modelle anzeigen
+            tools (bool): Nur Modelle mit Tool-Unterstützung anzeigen
+            vision (bool): Nur Modelle mit Vision-Unterstützung anzeigen
+            embeddings (bool): Nur Embedding-Modelle anzeigen
+            json_mode (bool): Nur Modelle mit JSON-Unterstützung anzeigen
+            web_search (bool): Nur Modelle mit Websuche anzeigen
+            reasoning (bool): Nur Modelle mit internem Reasoning anzeigen
+            cache (bool): Nur Modelle mit Cache-Unterstützung anzeigen
+        """
         response = requests.get(self.API_URL)
         if response.status_code != 200:
             raise RuntimeError(f"API request failed: {response.status_code}")

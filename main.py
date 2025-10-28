@@ -20,15 +20,15 @@ fetcher = ModelFetcher()
 @cl.on_chat_start
 async def on_chat_start():
     """Wird ausgeführt, wenn der Benutzer den Chat startet."""
-    free_models = fetcher.get_models(free=True, tools=True)
+    models = fetcher.get_models(free=True, tools=True)
 
-    if not free_models:
+    if not models:
         await cl.Message(
             content="Keine kostenlosen Modelle mit Tool-Unterstützung gefunden."
         ).send()
         return
 
-    model_options = [m["id"] for m in free_models]
+    model_options = [m["id"] for m in models]
 
     # Benutzer soll Modell wählen
     settings = await cl.ChatSettings(
