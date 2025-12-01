@@ -3,6 +3,13 @@
 # GUI
 Für das GUI selbst wird Chainlit verwendet Hiermeit bekommen wir eine schöne, Chat GPT ähnliche Chatoberfläche im Browser
 - https://docs.chainlit.io/get-started/overview
+
+Zum Ausführen des Chatbots mit GUI zunächst die requirements aus `requirements.txt` installieren.   
+Anschließend bitte den API key mithilfe dieses befhels setzen `$env:OPENROUTER_API_KEY="<API_KEY>"`
+
+Mit `chainlit run main.py -w` kann das programm nun ausgeführt werden.
+Es sollte sich nun ein browserfenster mti der chatbot oberfläche öffnen.
+
 ## model_fetcher
 Der Model fetcher ruft die API von openrouter auf und extrahiert von dort alle verfügmaren modelle als .json  
 ```python
