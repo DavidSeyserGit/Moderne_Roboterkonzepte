@@ -16,7 +16,25 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
-2. Set your OpenRouter API key (choose one method):
+2. Create API-Key in Open Router
+  **Create API-Key**
+   To create an API-Key got to:
+   ```bash
+   https://openrouter.ai/
+   ```
+   and select keys, there you can create one.
+
+3. Choose a model, in our case we are choosing:
+   ```bash
+   x-ai/grok-4.1-fast:free
+   ```
+   
+   To integrate the model in the code change this code segment in main.py and add your favourite model:
+   ```bash
+   model="x-ai/grok-4.1-fast:free"
+   ```
+ 
+4. Set your OpenRouter API key (choose one method):
 
    **Option A: Using a .env file (recommended)**
    ```bash

@@ -27,7 +27,7 @@ def main():
 
     # Initialize ChatOpenAI with OpenRouter
     llm = ChatOpenAI(
-        model="x-ai/grok-4-fast:free",
+        model="x-ai/grok-4.1-fast:free",
         openai_api_key=api_key,
         openai_api_base="https://openrouter.ai/api/v1",
         temperature=0
