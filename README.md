@@ -1,39 +1,40 @@
-# Moderne_Roboterkonzepte
+# Moderne Roboterkonzepte
 
-## Prerequisites
-
-This project requires [uv](https://github.com/astral-sh/uv) to be installed. uv is a fast Python package installer and resolver.
-
-To install uv, run:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+A chatbot for robot control using LangChain and OpenRouter.
 
 ## Setup
 
 1. Install dependencies:
 ```bash
-uv sync
+pip install -r requirements.txt
 ```
 
-2. Set your OpenRouter API key (choose one method):
+2. Create a `.env` file with your API key:
+```bash
+echo "OPENROUTER_API_KEY=your-api-key-here" > .env
+```
 
-   **Option A: Using a .env file (recommended)**
-   ```bash
-   echo "OPENROUTER_API_KEY=your-api-key-here" > .env
-   ```
-
-   **Option B: Export as environment variable**
-   ```bash
-   export OPENROUTER_API_KEY="your-api-key-here"
-   ```
-
-## Usage
-
-Run the main script to make an OpenRouter API call with LangChain and tool calling:
+## Run the App
 
 ```bash
-uv run main.py
+chainlit run main.py -w
 ```
 
-The script demonstrates how to use LangChain with OpenRouter's API and function calling to control robot navigation using the `move_to_pose` tool. LangChain provides a higher-level abstraction with agents that automatically handle tool calling and conversation flow.
+Open http://localhost:8000 in your browser.
+
+## Adding a New Tool
+
+Edit `tools.py`:
+
+```python
+@tool
+def my_new_tool(param: str) -> str:
+    """Description of what the tool does."""
+    # Your code here
+    return "result"
+
+# Add to the list
+available_tools = [move_to_pose, my_new_tool]
+```
+
+Restart the app to use the new tool.
