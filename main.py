@@ -90,11 +90,8 @@ async def on_message(message: cl.Message):
         await cl.Message(content="Kein Modell aktiv. Bitte starte den Chat neu.").send()
         return
 
-    answer = chatbot.get_response(message.content)
+    answer = await chatbot.get_response(message.content)
 
-    # Streaming-Output simulieren
-    msg = cl.Message(content="")
-    for token in answer.split():
-        await msg.stream_token(token + " ")
-    await msg.send()
+    # Send the response
+    await cl.Message(content=answer).send()
 

@@ -6,8 +6,8 @@ class Chatbot:
     def __init__(self, api_key: str, model: str):
         self.model_name = model
         self.llm = ChatOpenAI(
-            openai_api_base="https://openrouter.ai/api/v1",
-            openai_api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
             model=model,
         )
         self.messages = []  # Manual message history
@@ -16,14 +16,14 @@ class Chatbot:
     def update_model(self, api_key: str, model: str):
         self.model_name = model
         self.llm = ChatOpenAI(
-            openai_api_base="https://openrouter.ai/api/v1",
-            openai_api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
             model=model,
         )
 
-    #Verarbeitet Nutzereingaben mit Memory.
-    def get_response(self, user_input: str) -> str:
+    #Verarbeitet Nutzereingaben mit Memory (async).
+    async def get_response(self, user_input: str) -> str:
         self.messages.append(HumanMessage(content=user_input))
-        response = self.llm.invoke(self.messages)
+        response = await self.llm.ainvoke(self.messages)
         self.messages.append(AIMessage(content=response.content))
-        return response.content.strip()
+        return response.content.strip() if response.content else ""
