@@ -1,9 +1,13 @@
 # main.py
 import os
+from dotenv import load_dotenv
 import chainlit as cl
 from chainlit.input_widget import Select
 from model_fetcher import ModelFetcher
 from chatbot import Chatbot
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ============================================================
 # Initialisierung
