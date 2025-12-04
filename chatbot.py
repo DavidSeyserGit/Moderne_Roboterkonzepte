@@ -1,6 +1,5 @@
 from langchain_openai import ChatOpenAI
-from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 class Chatbot:
     #Chatbot-Klasse mit LangChain-Speicher und Modellwechsel.
@@ -11,12 +10,7 @@ class Chatbot:
             openai_api_key=api_key,
             model=model,
         )
-        self.memory = ConversationBufferMemory(return_messages=True)
-        self.chain = ConversationChain(
-            llm=self.llm,
-            memory=self.memory,
-            verbose=False
-        )
+        self.messages = []  # Manual message history
 
     #Wechselt das aktuelle Modell dynamisch.
     def update_model(self, api_key: str, model: str):
@@ -26,9 +20,10 @@ class Chatbot:
             openai_api_key=api_key,
             model=model,
         )
-        self.chain.llm = self.llm
 
     #Verarbeitet Nutzereingaben mit Memory.
-    def get_response(self, user_input: str) -> str:     
-        response = self.chain.run(input=user_input)
-        return response.strip()
+    def get_response(self, user_input: str) -> str:
+        self.messages.append(HumanMessage(content=user_input))
+        response = self.llm.invoke(self.messages)
+        self.messages.append(AIMessage(content=response.content))
+        return response.content.strip()
