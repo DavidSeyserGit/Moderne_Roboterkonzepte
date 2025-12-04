@@ -1,97 +1,71 @@
-# main.py
 import os
 from dotenv import load_dotenv
-import chainlit as cl
-from chainlit.input_widget import Select
-from model_fetcher import ModelFetcher
-from chatbot import Chatbot
+from langchain_openai import ChatOpenAI
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.tools import StructuredTool
+from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel, Field
+from tools import move_to_pose
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# ============================================================
-# Initialisierung
-# ============================================================
-api_key = os.getenv("OPENROUTER_API_KEY")
-if not api_key:
-    raise ValueError("Bitte setze vorher $env:OPENROUTER_API_KEY in deinem Terminal.")
-    # $env:OPENROUTER_API_KEY="<API_KEY>"
-fetcher = ModelFetcher()
 
-# ============================================================
-# Chat Start
-# ============================================================
-@cl.on_chat_start
-async def on_chat_start():
-    """Wird ausgeführt, wenn der Benutzer den Chat startet."""
-    models = fetcher.get_models(free=True, tools=True)
+class MoveToPoseInput(BaseModel):
+    """Input schema for move_to_pose tool"""
+    pose_str: str = Field(
+        description="A YAML string containing the pose with keys: x (float), y (float), and theta (float in radians). Example: 'x: 1.0\\ny: 2.0\\ntheta: 0.5'"
+    )
 
-    if not models:
-        await cl.Message(
-            content="Keine kostenlosen Modelle mit Tool-Unterstützung gefunden."
-        ).send()
+
+def main():
+    # Check for API key
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        print("Error: OPENROUTER_API_KEY environment variable not set")
         return
 
-    model_options = [m["id"] for m in models]
+    # Initialize ChatOpenAI with OpenRouter
+    llm = ChatOpenAI(
+        model="x-ai/grok-4-fast:free",
+        openai_api_key=api_key,
+        openai_api_base="https://openrouter.ai/api/v1",
+        temperature=0
+    )
 
-    # Benutzer soll Modell wählen
-    settings = await cl.ChatSettings(
-        [
-            Select(
-                id="Model",
-                label="🔘 Wähle ein OpenRouter-Modell mit Tool-Unterstützung",
-                values=model_options,
-                initial_index=0,
-            )
-        ]
-    ).send()
+    # Create tools with proper schema
+    tools = [
+        StructuredTool.from_function(
+            func=move_to_pose,
+            name="move_to_pose",
+            description="Sends a navigation goal to the nav2 stack to move the robot to a specific pose in the map frame. The pose includes x, y coordinates and theta (orientation angle in radians).",
+            args_schema=MoveToPoseInput,
+            return_direct=False
+        )
+    ]
 
-    chosen_model = settings["Model"]
-    chatbot = Chatbot(api_key, chosen_model)
+    # Create prompt template
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "You are a helpful robot navigation assistant. Use the available tools to help move the robot to specified positions."),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
 
-    # Session speichern
-    cl.user_session.set("chatbot", chatbot)
-    cl.user_session.set("model", chosen_model)
-    cl.user_session.set("api_key", api_key)
+    # Create agent
+    agent = create_tool_calling_agent(llm, tools, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
-    await cl.Message(
-        content=f"Modell gesetzt auf **{chosen_model}**.\n\n Willkommen! Stelle mir deine erste Frage!"
-    ).send()
+    # Get user input from terminal
+    user_input = input("Enter your message: ")
 
+    print(f"User: {user_input}\n")
 
-# ============================================================
-# Modell-Wechsel
-# ============================================================
-@cl.on_settings_update
-async def on_settings_update(settings: dict):
-    """Reagiert, wenn der Nutzer das Modell im UI ändert."""
-    new_model = settings.get("Model")
-    old_model = cl.user_session.get("model")
-    chatbot: Chatbot = cl.user_session.get("chatbot")
-    api_key = cl.user_session.get("api_key")
+    # Execute the agent
+    result = agent_executor.invoke({"input": user_input})
 
-    if new_model != old_model:
-        chatbot.update_model(api_key, new_model)
-        cl.user_session.set("model", new_model)
-
-        await cl.Message(
-            content=f"Modell erfolgreich gewechselt!\n\nAktuelles Modell: **{new_model}**"
-        ).send()
+    print(f"\nFinal Result: {result['output']}")
 
 
-# ============================================================
-# Nachrichtenverarbeitung
-# ============================================================
-@cl.on_message
-async def on_message(message: cl.Message):
-    """Behandelt eingehende Nachrichten."""
-    chatbot: Chatbot = cl.user_session.get("chatbot")
-    if not chatbot:
-        await cl.Message(content="Kein Modell aktiv. Bitte starte den Chat neu.").send()
-        return
-
-    answer = await chatbot.get_response(message.content)
-
-    # Send the response
-    await cl.Message(content=answer).send()
+if __name__ == "__main__":
+    main()
 
