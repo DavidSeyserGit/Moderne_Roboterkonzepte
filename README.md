@@ -22,6 +22,66 @@ chainlit run main.py -w
 
 Open http://localhost:8000 in your browser.
 
+## Docker Usage
+
+### Build and Start the Container
+
+```bash
+docker compose up -d
+```
+
+### Enter the Container
+
+```bash
+docker exec -it nav2-MRK bash
+```
+
+### Terminal 1: Start Nav2 Simulation
+
+Inside the container, launch the TurtleBot3 Nav2 simulation:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+export TURTLEBOT3_MODEL=waffle
+ros2 launch nav2_bringup tb3_simulation_launch.py
+```
+
+This will open RViz with the Nav2 stack and TurtleBot3 simulation.
+
+### Terminal 2: Start the Chatbot Server
+
+Open a second terminal into the container:
+
+```bash
+docker exec -it nav2-MRK bash
+```
+
+Then start the Chainlit server:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+chainlit run main.py -w
+```
+
+Open http://localhost:8000 in your browser to interact with the chatbot.
+
+### Verify ROS2 Topics
+
+To check if Nav2 is running correctly:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+ros2 topic list
+```
+
+You should see topics like `/cmd_vel`, `/map`, `/odom`, `/scan`, `/goal_pose`, etc.
+
+### Stop the Container
+
+```bash
+docker compose down
+```
+
 ## Adding a New Tool
 
 Edit `tools.py`:
