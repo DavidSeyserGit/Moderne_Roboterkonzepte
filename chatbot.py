@@ -1,9 +1,10 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from tools import available_tools
+import chainlit as cl
 
 class Chatbot:
-    #Chatbot-Klasse mit LangChain-Speicher und Modellwechsel.
+    # Chatbot-Klasse mit Tool-Unterstützung
     def __init__(self, api_key: str, model: str):
         self.model_name = model
         self.api_key = api_key
@@ -16,7 +17,7 @@ class Chatbot:
         ).bind_tools(self.tools)
         self.messages = []  # Manual message history
 
-    #Wechselt das aktuelle Modell dynamisch.
+    # Modellwechsel
     def update_model(self, api_key: str, model: str):
         self.model_name = model
         self.api_key = api_key
@@ -26,31 +27,41 @@ class Chatbot:
             model=model,
         ).bind_tools(self.tools)
 
-    #Verarbeitet Nutzereingaben mit Memory (async).
+    # Verarbeitet Nutzereingaben
     async def get_response(self, user_input: str) -> str:
         self.messages.append(HumanMessage(content=user_input))
         response = await self.llm.ainvoke(self.messages)
         self.messages.append(response)
-        
-        # Handle tool calls if present
+
+        # Werkzeugschleife
         while response.tool_calls:
             for tool_call in response.tool_calls:
                 tool_name = tool_call["name"]
                 tool_args = tool_call["args"]
-                
+
+                # CHAINLIT: Show Thinking-Step
+                await cl.Message(
+                    content=f"**Modell denkt...**\nEs möchte das Tool **{tool_name}** ausführen."
+                ).send()
+
                 # Execute the tool
                 if tool_name in self.tools_by_name:
                     tool_result = self.tools_by_name[tool_name].invoke(tool_args)
                 else:
                     tool_result = f"Error: Tool '{tool_name}' not found"
-                
-                # Add tool result to messages
+
+                # CHAINLIT: Show tool result
+                await cl.Message(
+                    content=f"**Tool-Ergebnis von {tool_name}:**\n```\n{tool_result}\n```"
+                ).send()
+
+                # Ergebnis dem Modell zurückgeben
                 self.messages.append(
                     ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"])
                 )
-            
-            # Get next response after tool execution
+
+            # Modellantwort nach Toolausführung abrufen
             response = await self.llm.ainvoke(self.messages)
             self.messages.append(response)
-        
+
         return response.content.strip() if response.content else ""
