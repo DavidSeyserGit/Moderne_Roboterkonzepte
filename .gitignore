@@ -36,3 +36,8 @@ ENV/
 .DS_Store
 Thumbs.db
 .chainlit
+
+.files
+
+# Local virtual environment file
+pyvenv.cfg

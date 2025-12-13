@@ -2,6 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from tools import available_tools
 import chainlit as cl
+from pathlib import Path
 
 class Chatbot:
     # Chatbot-Klasse mit Tool-Unterstützung
@@ -15,18 +16,17 @@ class Chatbot:
             api_key=api_key,
             model=model,
         ).bind_tools(self.tools)
+
+        # Load system prompt from file (required)
+        prompt_path = Path(__file__).parent / "system_prompt.txt"
+        if not prompt_path.exists():
+            raise FileNotFoundError(f"Required system prompt file not found: {prompt_path}")
+        system_prompt = prompt_path.read_text(encoding="utf-8")
+
         # Manual message history
         self.messages = [
             SystemMessage(
-                content=(
-                    "Du steuerst einen mobilen Roboter mit ROS 2.\n"
-                    "Bevor du das Tool 'move_to_pose' benutzt, rufe IMMER zuerst "
-                    "das Tool 'check_pose' mit der Zielpose und sinnvollen Toleranzen auf.\n"
-                    "Wenn 'within_tolerance' true ist, sende KEIN Navigationsziel.\n"
-                    "Wenn 'within_tolerance' false ist, benutze 'move_to_pose'.\n"
-                    "Nach jeder Navigation rufe 'check_pose' erneut auf und berichte "
-                    "die aktuelle Pose."
-                )
+                content=system_prompt
             )
         ]  
 
