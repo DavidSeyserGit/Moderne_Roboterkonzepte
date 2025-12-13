@@ -17,6 +17,7 @@ WORKDIR /app
 COPY requirements.txt .
 COPY *.py .
 COPY chainlit.md .
+COPY system_prompt.txt .
 
 # Install Python dependencies
 RUN pip3 install --break-system-packages --ignore-installed -r requirements.txt

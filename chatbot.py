@@ -2,6 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from tools import available_tools
 import chainlit as cl
+from pathlib import Path
 
 class Chatbot:
     # Chatbot-Klasse mit Tool-Unterstützung
@@ -15,7 +16,19 @@ class Chatbot:
             api_key=api_key,
             model=model,
         ).bind_tools(self.tools)
-        self.messages = []  # Manual message history
+
+        # Load system prompt from file (required)
+        prompt_path = Path(__file__).parent / "system_prompt.txt"
+        if not prompt_path.exists():
+            raise FileNotFoundError(f"Required system prompt file not found: {prompt_path}")
+        system_prompt = prompt_path.read_text(encoding="utf-8")
+
+        # Manual message history
+        self.messages = [
+            SystemMessage(
+                content=system_prompt
+            )
+        ]  
 
     # Modellwechsel
     def update_model(self, api_key: str, model: str):
