@@ -16,11 +16,14 @@ WORKDIR /app
 # Copy chatbot files
 COPY requirements.txt .
 COPY *.py .
-COPY chainlit.md .
 COPY system_prompt.txt .
 
+# Create and activate virtual environment
+RUN python3 -m venv /app/venv
+ENV PATH="/app/venv/bin:$PATH"
+
 # Install Python dependencies
-RUN pip3 install --break-system-packages --ignore-installed -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Set environment variables for display passthrough
 ENV DISPLAY=${DISPLAY}
