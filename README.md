@@ -27,6 +27,7 @@ Open http://localhost:8000 in your browser.
 ### Build and Start the Container
 
 ```bash
+touch .env        #falls .env not found
 docker compose up -d
 ```
 
