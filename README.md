@@ -28,6 +28,7 @@ Open http://localhost:8000 in your browser.
 
 ```bash
 docker compose up -d
+xhost +local:docker        #wird benötigt um GUI Fenster zu öffnen
 ```
 
 ### Enter the Container
