@@ -21,10 +21,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install Python dependencies
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Activate virtual environment in bashrc and add useful aliases
-RUN echo "source /opt/venv/bin/activate" >> ~/.bashrc && \
+# Source ROS2 and virtual environment in bashrc and add useful aliases
+RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc && \
+    echo "source /opt/venv/bin/activate" >> ~/.bashrc && \
     echo "alias ll='ls -lah'" >> ~/.bashrc && \
     echo "alias start-chatbot='chainlit run src/main.py'" >> ~/.bashrc
+
+# Set ROS_DOMAIN_ID to match nav2 container
+ENV ROS_DOMAIN_ID=0
 
 CMD ["/bin/bash"]
 
