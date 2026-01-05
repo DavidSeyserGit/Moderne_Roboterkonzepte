@@ -4,6 +4,7 @@ FROM ros:jazzy-ros-base
 RUN apt-get update && apt-get install -y \
     bash \
     python3-venv \
+    ros-jazzy-nav2-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
