@@ -1,0 +1,43 @@
+/* Fix settings modal position - prevent it from being cut off at the top */
+[role="dialog"],
+[role="alertdialog"] {
+    margin-top: 10vh !important;
+    max-height: 80vh !important;
+}
+
+/* Ensure the settings modal is properly positioned */
+.MuiDialog-root .MuiDialog-container {
+    align-items: flex-start !important;
+    padding-top: 10vh !important;
+}
+
+/* Alternative approach - center the modal with proper spacing */
+.MuiPaper-root[role="dialog"] {
+    margin-top: 10vh !important;
+    margin-bottom: 10vh !important;
+}
+
+/* Specific fix for Chainlit settings modal */
+div[class*="MuiDialog"] div[class*="MuiPaper"] {
+    margin-top: 10vh !important;
+}
+
+/* Make dropdown scrollable if content is too long */
+.MuiSelect-select {
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+}
+
+/* Settings dropdown menu positioning */
+.MuiPopover-root .MuiPaper-root {
+    max-height: 70vh !important;
+}
+
+/* Model selector improvements */
+.MuiMenu-list {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace !important;
+}
+
+.MuiMenuItem-root {
+    padding: 8px 16px !important;
+}

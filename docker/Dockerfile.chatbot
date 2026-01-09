@@ -10,17 +10,25 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy chatbot files
-COPY requirements.txt .
-COPY src/ ./src/
-COPY config/ ./config/
-
 # Create virtual environment in /opt/venv (won't be overwritten by volume mount)
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python dependencies
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Upgrade pip first (separate layer for caching)
+RUN pip install --upgrade pip setuptools wheel
+
+# Copy only requirements.txt first (better layer caching)
+COPY requirements.txt .
+
+# Install Python dependencies with pip cache mount (MUCH faster rebuilds)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
+
+# Copy application files last (changes most frequently)
+COPY src/ ./src/
+COPY config/ ./config/
+COPY .chainlit/ ./.chainlit/
+COPY public/ ./public/
 
 # Source ROS2 and virtual environment in bashrc and add useful aliases
 RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc && \

@@ -33,9 +33,14 @@ xhost +local:docker
 
 ### 3. Build and Start Containers
 
+## On the initial build Docker will take upwards of 10 mins to build, this is due to large python dependencies such as torch and langchain accumulating time.
+
+**Or standard build:**
 ```bash
 docker compose up -d --build
 ```
+
+The fast build script uses Docker BuildKit with caching for much faster rebuilds (especially for Python dependencies).
 
 This starts both containers:
 - The **chatbot** container auto-starts Chainlit on port 8000
@@ -104,8 +109,16 @@ docker compose down
 
 ### Rebuild After Code Changes
 
+**Fast rebuild (uses cache):**
 ```bash
-docker compose up -d --build
+./build.sh
+docker compose up -d
+```
+
+**Or force full rebuild (slower):**
+```bash
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ## Verify ROS2 Communication

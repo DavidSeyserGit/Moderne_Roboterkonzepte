@@ -40,6 +40,12 @@ docker-compose.yml
 Dockerfile*
 .dockerignore
 
-# Chainlit
-.chainlit/
+# Chainlit (keep config but exclude chat history)
+.chainlit/chat_files/
+
+# Data directories (large files, don't include in build context)
+data/
+*.pdf
+*.db
+*.sqlite
 

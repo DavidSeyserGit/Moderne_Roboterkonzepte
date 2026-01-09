@@ -2,6 +2,7 @@ import threading
 import time
 import math
 import yaml
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -9,7 +10,10 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav2_msgs.action import NavigateToPose
+
 from langchain_core.tools import tool
+
+from rag import retrieve_context, index_all_pdfs, auto_index_if_needed
 
 # Global node reference
 ros_node = None
@@ -24,7 +28,6 @@ class RobotToolsNode(Node):
         self.nav_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
         
         # Subscriber for AMCL Pose
-        # Subscriber for AMCL Pose (using Transient Local durability to catch latched messages)
         qos_profile = QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.current_pose = None
         self.pose_sub = self.create_subscription(
@@ -61,6 +64,13 @@ def ensure_ros_node_started():
 
 # Start ROS 2 node in background on module import
 ensure_ros_node_started()
+
+# Auto-index PDFs if needed on module import
+try:
+    status = auto_index_if_needed()
+    print(f"[RAG] {status}")
+except Exception as e:
+    print(f"[RAG] Auto-index check failed: {e}")
 
 
 @tool
@@ -103,15 +113,11 @@ def move_to_pose(pose_str: str) -> str:
         goal_msg.pose.pose.orientation.z = qz
         goal_msg.pose.pose.orientation.w = qw
 
-        # Wait for server (with logic to avoid blocking forever if down)
-        if not ros_node.nav_client.wait_for_server(timeout_sec=5.0):
+        if not ros_node.nav_client.wait_for_server(timeout_sec=2.0):
              return "Error: NavigateToPose action server not available."
 
         # Send goal async
         future = ros_node.nav_client.send_goal_async(goal_msg)
-        # We perform a brief wait to ensure sending worked, but don't wait for result
-        # Note: In a pure async tool we might return a callback, 
-        # but here we just fire and forget for non-blocking UI.
         
         return f"Navigation goal sent to x={x}, y={y}, theta={theta}. Movement started."
 
@@ -188,5 +194,77 @@ def check_pose(pose_str: str = "") -> str:
     except Exception as e:
         return f"Error checking pose: {str(e)}"
 
+
+@tool
+def query_documentation(query: str, operation: str = "search", k: int = 4) -> str:
+    """
+    Unified RAG tool for querying and managing project documentation.
+
+    Args:
+        query: Search query or location name
+        operation: Type of operation - "search" (default), "location", or "index"
+        k: Number of results to retrieve (default: 4)
+
+    Operations:
+        - "search": General document search, returns relevant context and sources
+        - "location": Search for a named location and extract pose coordinates (x, y, theta)
+        - "index": Re-index all PDFs in data/pdfs directory
+
+    Returns:
+        Formatted results based on operation type
+    """
+    import re
+
+    # Handle index operation
+    if operation == "index":
+        return index_all_pdfs()
+
+    # Handle location search with pose extraction
+    if operation == "location":
+        context, sources = retrieve_context(query, k=3)
+
+        if not context:
+            return f"Error: No documentation found for location '{query}'"
+
+        # Try to extract pose from context
+        # Pattern 1: "x=1.5, y=2.3, theta=0.0" or "x: 1.5, y: 2.3, theta: 0.0"
+        pattern1 = r"x\s*[=:]\s*([-+]?\d+\.?\d*)[,\s]+y\s*[=:]\s*([-+]?\d+\.?\d*)[,\s]+theta\s*[=:]\s*([-+]?\d+\.?\d*)"
+        match = re.search(pattern1, context, re.IGNORECASE)
+
+        if match:
+            x, y, theta = match.groups()
+            result = f"x: {x}\ny: {y}\ntheta: {theta}"
+            result += f"\n\nSource: {sources[0] if sources else 'unknown'}"
+            return result
+
+        # Pattern 2: Try to find YAML-like structure with location name
+        pattern2 = rf"{re.escape(query)}[:\s]+.*?x[:\s]+([-+]?\d+\.?\d*).*?y[:\s]+([-+]?\d+\.?\d*).*?theta[:\s]+([-+]?\d+\.?\d*)"
+        match = re.search(pattern2, context, re.IGNORECASE | re.DOTALL)
+
+        if match:
+            x, y, theta = match.groups()
+            result = f"x: {x}\ny: {y}\ntheta: {theta}"
+            result += f"\n\nSource: {sources[0] if sources else 'unknown'}"
+            return result
+
+        # If no structured pose found, return context for manual parsing
+        return f"Location '{query}' found but no clear pose coordinates detected. Context:\n\n{context[:500]}\n\nSources: {', '.join(sources)}"
+
+    # Default: general search operation
+    context, sources = retrieve_context(query, k=k)
+
+    if not context:
+        return "No relevant information found in documentation."
+
+    response = "Found context from documentation:\n\n"
+    response += context
+
+    if sources:
+        response += "\n\nSources:\n"
+        for src in sources:
+            response += f"- {src}\n"
+
+    return response
+
 # List of all available tools
-available_tools = [move_to_pose, check_pose]
+available_tools = [move_to_pose, check_pose, query_documentation]
