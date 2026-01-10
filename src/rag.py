@@ -1,13 +1,24 @@
 # rag.py
 from __future__ import annotations
 
-import argparse
 import os
 from typing import List, Tuple
 
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter 
+
+'''
+RecurisiveCharacterTextSplitter:
+    A text splitter that recursively splits text into chunks based on specified separators.
+    First it searches for paragraphs, if its smaller then the chunk size defined it keeps the chunk
+
+    if not it searches for new lines, if its smaller then the chunk size defined it keeps the chunk
+
+    if not it searches for spaces, if its smaller then the chunk size defined it keeps the chunk
+'''
+
+
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
@@ -16,7 +27,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PDF_DIR = os.getenv("PDF_DIR", os.path.join(PROJECT_ROOT, "data", "pdfs"))
 CHROMA_DIR = os.getenv("CHROMA_DIR", os.path.join(PROJECT_ROOT, "data", "chroma"))
 EMBED_MODEL = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-MIN_CONFIDENCE = float(os.getenv("MIN_CONFIDENCE", "0.35"))
+MIN_CONFIDENCE = float(os.getenv("MIN_CONFIDENCE", "0.0"))
 
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "800"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
@@ -110,19 +121,9 @@ def query_rag_with_scores(query: str, k: int = TOP_K) -> List[tuple[Document, fl
     return vectordb.similarity_search_with_score(query, k=k)
 
 
-def query_rag(query: str, k: int = TOP_K, search_type: str = "similarity") -> List[Document]:
-    vectordb = load_vectordb()
-    retriever = vectordb.as_retriever(
-        search_type=search_type,          # "similarity" oder "mmr"
-        search_kwargs={"k": k},
-    )
-    return retriever.invoke(query)
-
-
 def retrieve_context(
     query: str,
     k: int = TOP_K,
-    search_type: str = "similarity",  # bleibt drin, wird bei Option A ignoriert
     max_chars_per_doc: int = 1200,
     min_confidence: float = MIN_CONFIDENCE,
 ) -> Tuple[str, List[str]]:
@@ -172,17 +173,6 @@ def retrieve_context(
 
     return "\n\n".join(parts), sources
 
-def rag_answer_prompt(query: str, k: int = TOP_K, search_type: str = "similarity"):
-    context, sources = retrieve_context(query, k=k, search_type=search_type)
-    if not context:
-        return "KONTEXT: (keiner)\n", []
-    prompt_block = (
-        "Nutze ausschließlich den folgenden Kontext, um zu antworten. "
-        "Wenn die Antwort nicht im Kontext steht, sage: 'NICHT IN DOKUMENTEN'.\n\n"
-        f"KONTEXT:\n{context}\n"
-    )
-    return prompt_block, sources
-
 
 def index_all_pdfs() -> str:
     n_chunks = build_vectorstore(pdf_path=None)
@@ -216,37 +206,3 @@ def auto_index_if_needed() -> str:
         return f"Auto-indexed {len(pdf_files)} PDFs into {n_chunks} chunks. DB: {CHROMA_DIR}"
     except Exception as e:
         return f"Auto-index failed: {str(e)}"
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--build", action="store_true")
-    parser.add_argument("--query", type=str, default=None)
-    parser.add_argument("--interactive", action="store_true")
-    parser.add_argument("--k", type=int, default=TOP_K)
-    parser.add_argument("--search-type", type=str, default="similarity", choices=["similarity", "mmr"])
-    args = parser.parse_args()
-
-    if args.build:
-        build_vectorstore()
-
-    if args.query:
-        docs = query_rag(args.query, k=args.k, search_type=args.search_type)
-        for i, d in enumerate(docs, 1):
-            print("=" * 50)
-            print(f"Treffer {i} | source={d.metadata.get('source')} | page={d.metadata.get('page')}")
-            print((d.page_content or "")[:800], "...\n")
-
-    if args.interactive:
-        while True:
-            q = input("\nFrage an RAG (oder 'exit'): ").strip()
-            if q.lower() in ("exit", "quit"):
-                break
-            docs = query_rag(q, k=args.k, search_type=args.search_type)
-            for i, d in enumerate(docs, 1):
-                print("=" * 50)
-                print(f"Treffer {i} | source={d.metadata.get('source')} | page={d.metadata.get('page')}")
-                print((d.page_content or "")[:800], "...\n")
-
-
-if __name__ == "__main__":
-    main()

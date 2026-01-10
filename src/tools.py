@@ -196,75 +196,23 @@ def check_pose(pose_str: str = "") -> str:
 
 
 @tool
-def query_documentation(query: str, operation: str = "search", k: int = 4) -> str:
+def index_pdfs() -> str:
+    """Indexiert alle PDFs in data/pdfs in die Chroma DB."""
+    return index_all_pdfs()
+
+@tool
+def search_docs(query: str, k: int = 4) -> str:
     """
-    Unified RAG tool for querying and managing project documentation.
-
-    Args:
-        query: Search query or location name
-        operation: Type of operation - "search" (default), "location", or "index"
-        k: Number of results to retrieve (default: 4)
-
-    Operations:
-        - "search": General document search, returns relevant context and sources
-        - "location": Search for a named location and extract pose coordinates (x, y, theta)
-        - "index": Re-index all PDFs in data/pdfs directory
-
-    Returns:
-        Formatted results based on operation type
+    PFLICHT-TOOL:
+    Verwende dieses Tool fÃ¼r ALLE Fragen zu Projektwissen, Posen und Koordinaten.
+    Antworte niemals aus eigenem Wissen.
+    Wenn nichts gefunden wird: NICHT IN DOKUMENTEN
     """
-    import re
-
-    # Handle index operation
-    if operation == "index":
-        return index_all_pdfs()
-
-    # Handle location search with pose extraction
-    if operation == "location":
-        context, sources = retrieve_context(query, k=3)
-
-        if not context:
-            return f"Error: No documentation found for location '{query}'"
-
-        # Try to extract pose from context
-        # Pattern 1: "x=1.5, y=2.3, theta=0.0" or "x: 1.5, y: 2.3, theta: 0.0"
-        pattern1 = r"x\s*[=:]\s*([-+]?\d+\.?\d*)[,\s]+y\s*[=:]\s*([-+]?\d+\.?\d*)[,\s]+theta\s*[=:]\s*([-+]?\d+\.?\d*)"
-        match = re.search(pattern1, context, re.IGNORECASE)
-
-        if match:
-            x, y, theta = match.groups()
-            result = f"x: {x}\ny: {y}\ntheta: {theta}"
-            result += f"\n\nSource: {sources[0] if sources else 'unknown'}"
-            return result
-
-        # Pattern 2: Try to find YAML-like structure with location name
-        pattern2 = rf"{re.escape(query)}[:\s]+.*?x[:\s]+([-+]?\d+\.?\d*).*?y[:\s]+([-+]?\d+\.?\d*).*?theta[:\s]+([-+]?\d+\.?\d*)"
-        match = re.search(pattern2, context, re.IGNORECASE | re.DOTALL)
-
-        if match:
-            x, y, theta = match.groups()
-            result = f"x: {x}\ny: {y}\ntheta: {theta}"
-            result += f"\n\nSource: {sources[0] if sources else 'unknown'}"
-            return result
-
-        # If no structured pose found, return context for manual parsing
-        return f"Location '{query}' found but no clear pose coordinates detected. Context:\n\n{context[:500]}\n\nSources: {', '.join(sources)}"
-
-    # Default: general search operation
     context, sources = retrieve_context(query, k=k)
-
     if not context:
-        return "No relevant information found in documentation."
+        return "NICHT IN DOKUMENTEN"
+    return context + "\n\nQuellen:\n" + "\n".join(sources)
 
-    response = "Found context from documentation:\n\n"
-    response += context
 
-    if sources:
-        response += "\n\nSources:\n"
-        for src in sources:
-            response += f"- {src}\n"
-
-    return response
-
-# List of all available tools
-available_tools = [move_to_pose, check_pose, query_documentation]
+# available_tools erweitern
+available_tools = [check_pose, move_to_pose ,index_pdfs, search_docs]

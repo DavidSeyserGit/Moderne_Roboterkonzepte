@@ -6,6 +6,8 @@ from chainlit.input_widget import Select
 from model_fetcher import ModelFetcher
 from chatbot import Chatbot
 
+from rag import index_all_pdfs
+
 # Load environment variables from .env file (fallback for local development)
 load_dotenv()
 
@@ -34,6 +36,7 @@ fetcher = ModelFetcher()
 # ============================================================
 @cl.on_chat_start
 async def on_chat_start():
+    index_all_pdfs()
     """Wird ausgeführt, wenn der Benutzer den Chat startet."""
     # Fetch ALL models with tools (regardless of price)
     all_models = fetcher.get_models(free=False, tools=True)
@@ -160,6 +163,7 @@ async def on_message(message: cl.Message):
         return
 
     answer = await chatbot.get_response(message.content)
+    #await -> nicht blockend wartet bis roboter dort ist 
 
     # Send the response
     await cl.Message(content=answer).send()
