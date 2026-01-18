@@ -1,3 +1,4 @@
+# tools.py - LLM tools for robot control and document search
 import threading
 import time
 import math
@@ -11,23 +12,30 @@ from rclpy.qos import QoSProfile, DurabilityPolicy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav2_msgs.action import NavigateToPose
 
-from langchain_core.tools import tool
+from langchain_core.tools import tool  # @tool decorator exposes functions to the LLM
 
 from rag import retrieve_context, index_all_pdfs, auto_index_if_needed
 
-# Global node reference
+# Global ROS2 node reference - shared across all tool calls
 ros_node = None
 ros_executor = None
 ros_thread = None
 
+
 class RobotToolsNode(Node):
+    """
+    ROS2 node that provides robot control capabilities.
+    Subscribes to /amcl_pose for localization and uses NavigateToPose action for movement.
+    """
+
     def __init__(self):
         super().__init__('robot_tools_node')
-        
-        # Action Client for Navigation
+
+        # Action client for Nav2 navigation stack
         self.nav_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
-        
-        # Subscriber for AMCL Pose
+
+        # Subscribe to AMCL pose with TRANSIENT_LOCAL QoS
+        # TRANSIENT_LOCAL: receives last published message even if we subscribed after it was sent
         qos_profile = QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.current_pose = None
         self.pose_sub = self.create_subscription(
@@ -39,33 +47,35 @@ class RobotToolsNode(Node):
         self.get_logger().info("RobotToolsNode initialized.")
 
     def pose_callback(self, msg):
+        """Stores latest pose from AMCL (Adaptive Monte Carlo Localization)."""
         self.current_pose = msg
 
+
 def ensure_ros_node_started():
+    """Initializes ROS2 and starts the node in a background thread (singleton pattern)."""
     global ros_node, ros_executor, ros_thread
-    
+
     try:
-        # 1. Initialize rclpy if needed
         if not rclpy.ok():
             rclpy.init(args=None)
-        
-        # 2. Create node and executor if they don't exist
+
         if ros_node is None:
             ros_node = RobotToolsNode()
             ros_executor = MultiThreadedExecutor()
             ros_executor.add_node(ros_node)
-            
-            # 3. Start spinning in a background thread
+
+            # Spin in background thread so tools don't block
             ros_thread = threading.Thread(target=ros_executor.spin, daemon=True)
             ros_thread.start()
-            
+
     except Exception as e:
         print(f"Error initializing ROS node: {e}")
 
-# Start ROS 2 node in background on module import
+
+# Initialize ROS2 on module import
 ensure_ros_node_started()
 
-# Auto-index PDFs if needed on module import
+# Auto-index PDFs on startup if needed
 try:
     status = auto_index_if_needed()
     print(f"[RAG] {status}")
@@ -76,32 +86,32 @@ except Exception as e:
 @tool
 def move_to_pose(pose_str: str) -> str:
     """
-    Sends a navigation goal to the nav2 stack to move the robot to a specified pose.
-    This is non-blocking and returns immediately once the goal is sent.
-    
+    Sends a navigation goal to Nav2 to move the robot to a specified pose.
+    Non-blocking - returns immediately after goal is sent.
+
     Args:
-        pose_str: A YAML string containing x, y, and theta values for the target pose.
-                  Example: "x: 1.0\ny: 2.0\ntheta: 1.57"
-    
+        pose_str: YAML string with x, y, theta (radians). Example: "x: 1.0\ny: 2.0\ntheta: 1.57"
+
     Returns:
-        Status message indicating if the goal was successfully sent.
+        Status message indicating if goal was sent successfully.
     """
     global ros_node
     if ros_node is None:
         return "Error: ROS 2 node is not initialized."
 
     try:
-        # parse the pose string
+        # Parse YAML pose input
         pose = yaml.safe_load(pose_str)
         x = float(pose['x'])
         y = float(pose['y'])
         theta = float(pose['theta'])
 
-        # compute quaternion from theta
+        # Convert theta (yaw angle) to quaternion for ROS
+        # Only z and w components needed for 2D rotation around z-axis
         qz = math.sin(theta / 2.0)
         qw = math.cos(theta / 2.0)
 
-        # Create goal message
+        # Build NavigateToPose goal message
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose.header.frame_id = 'map'
         goal_msg.pose.header.stamp = ros_node.get_clock().now().to_msg()
@@ -113,49 +123,57 @@ def move_to_pose(pose_str: str) -> str:
         goal_msg.pose.pose.orientation.z = qz
         goal_msg.pose.pose.orientation.w = qw
 
+        # Wait for action server to be available
         if not ros_node.nav_client.wait_for_server(timeout_sec=2.0):
-             return "Error: NavigateToPose action server not available."
+            return "Error: NavigateToPose action server not available."
 
-        # Send goal async
+        # Send goal asynchronously (non-blocking)
         future = ros_node.nav_client.send_goal_async(goal_msg)
-        
+
         return f"Navigation goal sent to x={x}, y={y}, theta={theta}. Movement started."
 
     except Exception as e:
         return f"Error sending navigation goal: {str(e)}"
 
+
 @tool
 def check_pose(pose_str: str = "") -> str:
     """
-    Reads current robot pose from memory (updated via /amcl_pose topic) 
-    and optionally checks distance/yaw error to a target.
-    Target can be YAML (x,y,theta, optional tol_xy,tol_theta) or plain numbers: "x y theta [tol_xy tol_theta]".
+    Reads current robot pose from AMCL. Optionally compares to a target pose.
+
+    Args:
+        pose_str: Optional target pose as YAML (x,y,theta) or "x y theta [tol_xy tol_theta]"
+
+    Returns:
+        Current pose, or comparison with target including distance error and tolerance check.
     """
     global ros_node
     if ros_node is None:
         return "Error: ROS 2 node is not initialized."
-    
+
     if ros_node.current_pose is None:
         return "Waiting for /amcl_pose data... (Robot might not be localized yet)"
 
     try:
-        # 1) Get current pose from cached message
+        # Extract current pose from cached AMCL message
         msg = ros_node.current_pose
         pos = msg.pose.pose.position
         ori = msg.pose.pose.orientation
 
+        # Convert quaternion to yaw angle (theta)
+        # Formula: yaw = atan2(2*(w*z + x*y), 1 - 2*(y² + z²))
         siny_cosp = 2.0 * (ori.w * ori.z + ori.x * ori.y)
         cosy_cosp = 1.0 - 2.0 * (ori.y * ori.y + ori.z * ori.z)
         theta_cur = math.atan2(siny_cosp, cosy_cosp)
 
         current = {"x": float(pos.x), "y": float(pos.y), "theta": float(theta_cur)}
 
-        # 2) No target → just return pose
+        # If no target provided, just return current pose
         pose_str = pose_str or ""
         if not pose_str.strip():
             return yaml.safe_dump(current, sort_keys=False)
 
-        # 3) Parse target (YAML first, else numbers fallback)
+        # Parse target pose (try YAML first, then space-separated numbers)
         import re
         s = pose_str.replace("\t", "    ").replace("ol_xy:", "tol_xy:").replace("ol_theta:", "tol_theta:")
         try:
@@ -177,9 +195,11 @@ def check_pose(pose_str: str = "") -> str:
         tol_xy = target.get("tol_xy", 0.25)
         tol_theta = target.get("tol_theta", 0.25)
 
+        # Calculate errors
         dx = current["x"] - float(target["x"])
         dy = current["y"] - float(target["y"])
         dist = math.hypot(dx, dy)
+        # Normalize angle difference to [-pi, pi]
         dtheta = abs((current["theta"] - float(target["theta"]) + math.pi) % (2 * math.pi) - math.pi)
         within = dist <= tol_xy and dtheta <= tol_theta
 
@@ -197,16 +217,22 @@ def check_pose(pose_str: str = "") -> str:
 
 @tool
 def index_pdfs() -> str:
-    """Indexiert alle PDFs in data/pdfs in die Chroma DB."""
+    """Re-indexes all PDFs in data/pdfs into the Chroma vector database."""
     return index_all_pdfs()
+
 
 @tool
 def search_docs(query: str, k: int = 4) -> str:
     """
-    PFLICHT-TOOL:
-    Verwende dieses Tool fÃ¼r ALLE Fragen zu Projektwissen, Posen und Koordinaten.
-    Antworte niemals aus eigenem Wissen.
-    Wenn nichts gefunden wird: NICHT IN DOKUMENTEN
+    Searches indexed PDFs for information relevant to the query.
+    Uses semantic similarity (not keyword matching) via RAG.
+
+    Args:
+        query: The question or search query
+        k: Number of document chunks to retrieve (default 4)
+
+    Returns:
+        Relevant document excerpts with sources, or "NICHT IN DOKUMENTEN" if nothing found.
     """
     context, sources = retrieve_context(query, k=k)
     if not context:
@@ -214,5 +240,5 @@ def search_docs(query: str, k: int = 4) -> str:
     return context + "\n\nQuellen:\n" + "\n".join(sources)
 
 
-# available_tools erweitern
-available_tools = [check_pose, move_to_pose ,index_pdfs, search_docs]
+# List of tools available to the LLM
+available_tools = [check_pose, move_to_pose, index_pdfs, search_docs]

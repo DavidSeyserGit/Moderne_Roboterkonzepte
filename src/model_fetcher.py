@@ -1,10 +1,14 @@
+# model_fetcher.py - Fetches available LLM models from OpenRouter API
 import requests
 
+
 class ModelFetcher:
-    #Durchsucht alle verfügbaren Modelle nach den gewünschten Funktionen.
+    """Queries OpenRouter API to get available models filtered by capabilities."""
+
     API_URL = "https://openrouter.ai/api/v1/models"
 
     def __init__(self):
+        # Pricing fields to check when determining if a model is free
         self.price_fields = [
             "prompt", "completion", "request",
             "image", "web_search", "internal_reasoning",
@@ -23,16 +27,20 @@ class ModelFetcher:
         cache: bool = False,
     ):
         """
-        Lädt Modelle von OpenRouter mit flexiblen Filtern.
-        Parameter:
-            free (bool): Nur kostenlose Modelle anzeigen
-            tools (bool): Nur Modelle mit Tool-Unterstützung anzeigen
-            vision (bool): Nur Modelle mit Vision-Unterstützung anzeigen
-            embeddings (bool): Nur Embedding-Modelle anzeigen
-            json_mode (bool): Nur Modelle mit JSON-Unterstützung anzeigen
-            web_search (bool): Nur Modelle mit Websuche anzeigen
-            reasoning (bool): Nur Modelle mit internem Reasoning anzeigen
-            cache (bool): Nur Modelle mit Cache-Unterstützung anzeigen
+        Fetches models from OpenRouter with optional filters.
+
+        Args:
+            free: Only return models where all pricing fields are "0"
+            tools: Only models supporting function/tool calling
+            vision: Only models supporting image input
+            embeddings: Only embedding models
+            json_mode: Only models supporting structured JSON output
+            web_search: Only models with web search capability
+            reasoning: Only models with chain-of-thought reasoning
+            cache: Only models supporting prompt caching
+
+        Returns:
+            List of model dicts with id, name, description, supported params, pricing
         """
         response = requests.get(self.API_URL)
         if response.status_code != 200:
@@ -45,11 +53,9 @@ class ModelFetcher:
             pricing = m.get("pricing", {})
             supported = m.get("supported_parameters", [])
 
-            # Preisfilter
+            # Apply filters - skip model if it doesn't match criteria
             if free and not all(pricing.get(field, "0") == "0" for field in self.price_fields):
                 continue
-
-            # Parameterfilter
             if tools and "tools" not in supported:
                 continue
             if vision and "vision" not in supported:
